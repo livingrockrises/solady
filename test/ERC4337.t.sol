@@ -11,6 +11,7 @@ import {MockERC1271Wallet} from "./utils/mocks/MockERC1271Wallet.sol";
 import {LibClone} from "../src/utils/LibClone.sol";
 import {LibString} from "../src/utils/LibString.sol";
 import {LibZip} from "../src/utils/LibZip.sol";
+import { TokenWithPermit } from "./utils/mocks/MockPermitToken.sol";
 
 contract Target {
     error TargetError(bytes data);
@@ -50,17 +51,23 @@ contract ERC4337Test is SoladyTest {
     bytes32 internal constant _DOMAIN_SEP_B =
         0xa1a044077d7677adbbfa892ded5390979b33993e0e2a457e3f974bbcda53821b;
 
+    bytes32 internal _DOMAIN_SEP_C;
+
     address internal constant _ENTRY_POINT = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
 
     address erc4337;
 
     MockERC4337 account;
 
+    TokenWithPermit public permitToken;   
+
     function setUp() public {
         // Etch something onto `_ENTRY_POINT` such that we can deploy the account implementation.
         vm.etch(_ENTRY_POINT, hex"00");
         erc4337 = address(new MockERC4337());
         account = MockERC4337(payable(LibClone.deployERC1967(erc4337)));
+        permitToken = new TokenWithPermit("TestToken", "TST");
+        _DOMAIN_SEP_C = permitToken.DOMAIN_SEPARATOR();
     }
 
     function testDisableInitializerForImplementation() public {
@@ -373,6 +380,27 @@ contract ERC4337Test is SoladyTest {
 
         signature = "";
         assertEq(account.isValidSignature(t.contents, signature), bytes4(0xffffffff));
+    }
+
+    function testIsValidSignature_MockProtocol() public {
+        vm.txGasPrice(10);
+        _TestTemps memory t;
+        t.contents = keccak256(abi.encode(permitToken.PERMIT_TYPEHASH_LOCAL, address(account), address(0x69), 1e18, permitToken.nonces(address(account)), block.timestamp));
+        (t.signer, t.privateKey) = _randomSigner();
+        (t.v, t.r, t.s) = vm.sign(t.privateKey, _toERC1271Hash(t.contents));
+
+        account.initialize(t.signer);
+
+        bytes memory contentsType = "Contents(bytes32 stuff)";
+        bytes memory signature = abi.encodePacked(
+            t.r, t.s, t.v, _DOMAIN_SEP_B, t.contents, contentsType, uint16(contentsType.length)
+        );
+        assertEq(
+            account.isValidSignature(_toContentsHash(t.contents), signature), bytes4(0x1626ba7e)
+        );
+
+        permitToken.permitWith1271(address(account), address(0x69), 1e18, block.timestamp, signature);
+        assertEq(permitToken.allowance(address(account), address(0x69)), 1e18);
     }
 
     function testIsValidSignaturePersonalSign() public {
