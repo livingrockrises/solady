@@ -2165,7 +2165,7 @@ contract TokenWithPermit is ERC20Permit {
 
     error ERC1271InvalidSigner(address signer);
 
-    bytes32 public constant PERMIT_TYPEHASH_LOCAL =
+    bytes32 public PERMIT_TYPEHASH_LOCAL =
         keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
     constructor(string memory name, string memory symbol) ERC20Permit(name) ERC20(name, symbol) {

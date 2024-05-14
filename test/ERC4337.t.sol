@@ -385,7 +385,7 @@ contract ERC4337Test is SoladyTest {
     function testIsValidSignature_MockProtocol() public {
         vm.txGasPrice(10);
         _TestTemps memory t;
-        t.contents = keccak256(abi.encode(permitToken.PERMIT_TYPEHASH_LOCAL, address(account), address(0x69), 1e18, permitToken.nonces(address(account)), block.timestamp));
+        t.contents = keccak256(abi.encode(permitToken.PERMIT_TYPEHASH_LOCAL(), address(account), address(0x69), 1e18, permitToken.nonces(address(account)), block.timestamp));
         (t.signer, t.privateKey) = _randomSigner();
         (t.v, t.r, t.s) = vm.sign(t.privateKey, _toERC1271Hash2(t.contents));
 
